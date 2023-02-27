@@ -1,34 +1,14 @@
 const fs = require('fs');
-const { promisify } = require('util');
+const { readdirSync, readFileSync, rmSync, writeFileSync, lstatSync } = require('fs');
+const path = require('path');
 
-const readdir = promisify(fs.readdir);
-const readFile = promisify(fs.readFile);
-const writeFile = promisify(fs.writeFile);
+const attributes = ['width', 'height', 'fill', 'stroke', 'stroke-width', 'opacity'];
 
-const properties = ['width', 'height', 'fill', 'stroke', 'stroke-width', 'opacity'];
-
-const newProperties = [
-	':width="width"',
-	':height="height"',
-	':fill="fill"',
-	':stroke="stroke"',
-	':stroke-width="strokeWidth"',
-	':opacity="opacity"',
-];
-
-function appendColor(property, color) {
-	return `:${property}='solid ? ${property} :${color}'`;
+function write(file, svg, defaultProps) {
+	writeFileSync(file, createComponent(svg, defaultProps));
 }
 
-async function read(svgPath) {
-	return (await readFile(svgPath, 'utf-8')).toString();
-}
-
-async function write(file, svg, defaultProps) {
-	await writeFile(file, createComponent(svg, defaultProps));
-}
-
-async function createDirectory(target) {
+function createDirectory(target) {
 	if (!fs.existsSync(target)) {
 		fs.mkdirSync(target, { recursive: true });
 	}
@@ -43,99 +23,97 @@ function getSvgTag(svg) {
 	return null;
 }
 
-function getOpenSvgTag(svg) {
-	const regex = /(<svg)([^>]*)>/gu;
-	const openTag = svg.match(regex);
-	if (openTag) {
-		return openTag[0];
-	}
-	return null;
-}
+function extractAttributes(svgTag) {
+	const values = [];
+	for (let index = 0; index < attributes.length; index += 1) {
+		const attribute = attributes[index];
+		const regexString = `(?<=\\s)(${attribute}="[^"]*")`;
 
-function setProps(svgTag, properties, newProperties) {
-	const defaultProps = [];
-	for (let index = 0; index < properties.length; index += 1) {
-		const regexString = `(?<=\\s)(${properties[index]}="[^"]*")`;
-		const regex = new RegExp(regexString, 'gu');
+		let regex = new RegExp(regexString, 'gu');
+
+		if (attribute == 'width' || attribute == 'height') {
+			regex = new RegExp(regexString, 'u');
+		}
+
 		const matches = svgTag.match(regex);
+
 		if (matches) {
-			defaultProps.push(matches[0].split('=')[1]);
-			const regex = new RegExp(regexString, 'u');
-			if (properties[index] === 'fill') {
-				// eslint-disable-next-line no-loop-func
-				matches.forEach((match, i) => {
-					if (i !== 0) {
-						svgTag = svgTag.replace(regex, appendColor(properties[index], match.split('=')[1]));
-					} else {
-						svgTag = svgTag.replace(regex, newProperties[index]);
-					}
-				});
-			} else if (!getOpenSvgTag(svgTag).match(regex)) {
-				svgTag = `${svgTag.slice(0, 4)} ${newProperties[index]}${svgTag.slice(4)}`;
-			} else {
-				svgTag = svgTag.replace(regex, newProperties[index]);
-			}
+			const value = matches[0].split('=')[1];
+			values.push(value);
+
+			svgTag = svgTag.replace(
+				regex,
+				`:${attribute}='${attribute.replace('-', '')} ? ${attribute.replace('-', '')}: ${value}'`
+			);
 		} else {
-			defaultProps.push(null);
+			values.push(null);
 			// If tag already don't have the properties, add the newProperties to the svg
-			svgTag = `${svgTag.slice(0, 4)} ${newProperties[index]}${svgTag.slice(4)}`;
+			svgTag = `${svgTag.slice(0, 4)} :${attribute}='${attribute.replace('-', '')}' ${svgTag.slice(
+				4
+			)}`;
 		}
 	}
 
-	return { newSvgTag: svgTag, defaultProps };
+	return { newSvgTag: svgTag, values };
 }
 
-function createComponent(svg, defaultProps) {
-	return `<template>${svg}
+function createComponent(svg, values) {
+	return `<template>
+	<span :style="{fill: fill ? fill : undefined, width: width ? width : undefined, height: height ? height : undefined}">${svg}</span>
+	
 </template>
 
 <script>
 export default {
   props: {
-	width:{type:String,default:${defaultProps[0] ?? "'24'"}},
+	width:{type:String,default:undefined},
     height: {type:String,default:'100%'},
-    fill: {type:String,default:${defaultProps[2] ?? "'none'"}},
-    stroke: {type:String,default:${defaultProps[3] ?? "'none'"}},
-    strokeWidth:{type:String,default:${defaultProps[4] ?? "'1'"}},
-    opacity:{type:String,default:${defaultProps[5] ?? "'1'"}},
-	solid:{type:Boolean,default:false}
+    fill: {type:String,default:undefined},
+    stroke: {type:String,default:${values[3] ?? "'none'"}},
+    strokewidth:{type:String,default:${values[4] ?? "'1'"}},
+    opacity:{type:String,default:${values[5] ?? "'1'"}},
   },
 };
 </script>
 
 `;
 }
+function convert(svgPath, target) {
+	// Create Target Directory
+	createDirectory(target);
+	const dirs = readdirSync(svgPath);
 
-async function convert(svgPath, target) {
-	await createDirectory(target);
-	const dirs = await readdir(svgPath);
+	// Loop through directories
 
 	for (let index = 0; index < dirs.length; index += 1) {
-		const fullDir = `${svgPath}/${dirs[index]}`;
-		if (fs.lstatSync(fullDir).isDirectory()) {
-			await convert(fullDir, `${target}/${dirs[index]}`);
+		const fullDir = path.join(svgPath, dirs[index]);
+		if (lstatSync(fullDir).isDirectory()) {
+			const subTarget = path.join(target, dirs[index]);
+			convert(fullDir, subTarget);
 		} else {
-			const content = await read(fullDir);
+			// Read the svg
+			const content = readFileSync(fullDir, 'utf-8').toString();
 			const svgTag = getSvgTag(content);
 
 			if (svgTag) {
-				const { newSvgTag, defaultProps } = await setProps(svgTag, properties, newProperties);
+				const { newSvgTag, values } = extractAttributes(svgTag);
 				const fileName =
 					dirs[index].split('.')[0][0].toUpperCase() + dirs[index].split('.')[0].slice(1);
-				await write(`${target}/${fileName}Svg.vue`, newSvgTag, defaultProps);
+				write(`${target}/${fileName}Svg.vue`, newSvgTag, values);
 			}
 		}
 	}
 }
 
-async function handle(svgPath, target) {
+function handle(svgPath, target) {
 	try {
 		if (!fs.existsSync(svgPath)) {
 			throw new Error(`No such file or directory ${svgPath}`);
-		} else {
-			fs.rmdirSync(target, { recursive: true });
-			convert(svgPath, target);
+		} else if (fs.existsSync(target)) {
+			// Remove for overriding
+			rmSync(target, { recursive: true });
 		}
+		convert(svgPath, target);
 	} catch (error) {
 		console.log(error.message);
 	}

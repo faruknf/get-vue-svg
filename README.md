@@ -1,4 +1,4 @@
-# **Convert Svg Files to the Vue Components**
+# **Convert Svgs to Vue Components**
 
 ```bash
 #Input                 #Output
@@ -35,25 +35,15 @@ or launch the following command if you installed it globally.
 get-vue-svg <your-svg-folder-path>
 ```
 
-Then you can use the component after you imported it.
+The command above will create your components, then you can use the component after you imported it.
 
 ```js
-<VueSvg solid width="40px" fill="blue" stroke="white" strokeWidth="1" opacity="0.4" />
+<VueSvg width="40px" fill="blue" stroke="white" strokeWidth="1" />
 ```
-
-## Solid Prop
-
-When you use the solid prop, the fill prop effect the all svg and generate one color(solid) svg.
-
-For Example
-
-<img src="ss.png" />
 
 ## Props
 
 The default values of the following props are their original values, but if the SVG does not have the following properties, the following values will be the default of the SVG props.
-
-\*\* Type of the all props is string except for solid
 
 | props       | default |
 | ----------- | ------- |
@@ -63,7 +53,6 @@ The default values of the following props are their original values, but if the 
 | stroke      | none    |
 | strokeWidth | 1       |
 | opacity     | 1       |
-| solid       | false   |
 
 ### License
 
