@@ -38,7 +38,7 @@ get-vue-svg <your-svg-folder-path>
 The command above will create your components, then you can use the component after you imported it.
 
 ```js
-<VueSvg width="40px" fill="blue" stroke="white" strokeWidth="1" />
+<VueSvg width="40px" fill="blue" stroke="white" strokewidth="1" />
 ```
 
 ## Props
