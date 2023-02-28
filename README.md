@@ -51,7 +51,7 @@ The default values of the following props are their original values, but if the 
 | height      | 100%    |
 | fill        | none    |
 | stroke      | none    |
-| strokeWidth | 1       |
+| strokewidth | 1       |
 | opacity     | 1       |
 
 ### License
